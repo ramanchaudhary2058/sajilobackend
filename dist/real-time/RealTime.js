@@ -13,8 +13,8 @@ exports.io = new socket_io_1.Server(exports.serverInstance, {
     cors: {
         origin: [
             "http://localhost:5173",
-            "https://sajilofrontend.vercel.app/",
-            "*",
+            // "https://city-hostel-zeta.vercel.app/",
+            // "*",
         ],
         methods: ["POST", "GET"],
         credentials: true,
