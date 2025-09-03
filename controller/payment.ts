@@ -1,0 +1,577 @@
+
+// import { Request, Response } from "express";
+// import dotenv from "dotenv";
+// import { pool } from "../db";
+
+
+// dotenv.config();
+
+
+
+
+// // Initiate payment
+// export const initiatePayment = async (req: Request, res: Response) => {
+//   const amount = parseInt(req.params.amount, 10);
+//   if (isNaN(amount) || amount <= 0) return res.status(400).json({ error: "Invalid amount" });
+
+//   const mode = process.env.MODE;
+//   const website_url = mode === "development" ? "http://localhost:5173" : "https://city-hostel-zeta.vercel.app";
+//   const return_url = mode === "development" ? "http://localhost:5173/payment-success" : "https://city-hostel-zeta.vercel.app/payment-success";
+
+//   const amountInPaisa = amount * 100;
+//   const data = JSON.stringify({
+//     return_url,
+//     website_url,
+//     amount: amountInPaisa,
+//     purchase_order_id: `order-${Date.now()}`,
+//     purchase_order_name: "Hostel Booking",
+//     customer_info: {
+//       name: "Raman Chaudhary",
+//       email: "ramancdry2058@gmail.com",
+//       phone: "9804621935",
+//     },
+//     amount_breakdown: [{ label: "Total Price", amount: amountInPaisa }],
+//   });
+
+//   try {
+//     const response = await fetch("https://a.khalti.com/api/v2/epayment/initiate/", {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json",
+//         Authorization: `Key ${process.env.KHALTI_SECRET_KEY}`,
+//       },
+//       body: data,
+//     });
+
+//     const result = await response.json();
+//     if (result.payment_url) return res.json({ url: result.payment_url });
+//     return res.status(400).json({ error: "Failed to initiate payment", details: result });
+//   } catch (err) {
+//     console.error("Server error:", err);
+//     return res.status(500).json({ error: "Server error" });
+//   }
+// };
+
+// // Verify payment
+
+// export const verifyPayment = async (req: Request, res: Response) => {
+//   const { pidx, bookingId } = req.body;
+
+//   if (!pidx || !bookingId) {
+//     return res.status(400).json({ success: false, message: "Missing payment information" });
+//   }
+
+//   try {
+//     const response = await fetch("https://a.khalti.com/api/v2/epayment/lookup/", {
+//       method: "POST",
+//       headers: { 
+//         "Content-Type": "application/json", 
+//         Authorization: `Key ${process.env.KHALTI_SECRET_KEY}` 
+//       },
+//       body: JSON.stringify({ pidx }),
+//     });
+
+//     if (!response.ok) {
+//       throw new Error(`Khalti API responded with status: ${response.status}`);
+//     }
+
+//     const result = await response.json();
+//     // console.log("Khalti verification response:", result);
+
+//     switch (result.status) {
+//       case "Completed":
+//         await updateBooking(bookingId, { 
+//           paymentStatus: "FullPayment",
+//           payment: result.total_amount / 100,
+//           status: "confirmed",
+//           transactionId: result.transaction_id,
+//           pidx: result.pidx,
+//           isActiveStatus: true, // activate booking
+//         });
+//         return res.json({ 
+//           success: true, 
+//           status: "Completed", 
+//           amount: result.total_amount / 100, 
+//           transactionId: result.transaction_id 
+//         });
+
+//       case "Pending":
+//       case "Initiated":
+//         await updateBooking(bookingId, { 
+//           paymentStatus: "Pending", 
+//           status: "pending",
+//           isActiveStatus: false, // not active yet
+//         });
+//         return res.json({ 
+//           success: false, 
+//           status: result.status, 
+//           message: "Payment is being processed" 
+//         });
+
+//       case "Failed":
+//       case "Cancelled":
+//       case "Expired":
+//         await updateBooking(bookingId, { 
+//           paymentStatus: "Pending", 
+//           status: "pending",
+//           isActiveStatus: false, // mark inactive
+//         });
+//         return res.status(400).json({ 
+//           success: false, 
+//           status: result.status, 
+//           message: "Payment failed, cancelled, or expired" 
+//         });
+
+//       default:
+//         return res.status(400).json({ 
+//           success: false, 
+//           status: result.status, 
+//           message: result.message || "Payment not completed" 
+//         });
+//     }
+//   } catch (err) {
+//     console.error("Verification error:", err);
+//     return res.status(500).json({ success: false, message: "Payment verification failed. Try again later." });
+//   }
+// };
+
+// // Update booking helper
+// async function updateBooking(bookingId: string, data: any) {
+//   const fields: string[] = [];
+//   const values: any[] = [];
+
+//   for (const key in data) {
+//     fields.push(`${key} = ?`);
+//     values.push(data[key]);
+//   }
+
+//   values.push(bookingId);
+//   const query = `UPDATE bookings SET ${fields.join(", ")} WHERE id = ?`;
+
+//   await pool.query(query, values);
+// }
+
+
+import { Request, Response } from "express";
+import dotenv from "dotenv";
+import { pool } from "../db";
+
+import { RowDataPacket } from "mysql2";          // for typed query results
+import { getUserSocketId, io } from "../real-time/RealTime";
+import { sendMail } from "../utils";
+
+dotenv.config();
+
+// Initiate payment
+export const initiatePayment = async (req: Request, res: Response) => {
+  const amount = parseInt(req.params.amount, 10);
+  if (isNaN(amount) || amount <= 0) return res.status(400).json({ error: "Invalid amount" });
+
+  const mode = process.env.MODE;
+  const website_url = mode === "development" ? "http://localhost:5173" : "https://city-hostel-zeta.vercel.app";
+  const return_url = mode === "development" ? "http://localhost:5173/payment-success" : "https://city-hostel-zeta.vercel.app/payment-success";
+
+  const amountInPaisa = amount * 100;
+  const data = JSON.stringify({
+    return_url,
+    website_url,
+    amount: amountInPaisa,
+    purchase_order_id: `order-${Date.now()}`,
+    purchase_order_name: "Sajilo Aawas Booking",
+    customer_info: {
+      name: "Sajilo Aawas",
+      email: "ramancdry2058@gmail.com",
+      phone: "9865809181",
+    },
+    amount_breakdown: [{ label: "Total Price", amount: amountInPaisa }],
+  });
+
+  try {
+    const response = await fetch("https://a.khalti.com/api/v2/epayment/initiate/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Key ${process.env.KHALTI_SECRET_KEY}`,
+      },
+      body: data,
+    });
+
+    const result = await response.json();
+    if (result.payment_url) return res.json({ url: result.payment_url });
+    return res.status(400).json({ error: "Failed to initiate payment", details: result });
+  } catch (err) {
+    console.error("Server error:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+};
+export const verifyPayment = async (req: Request, res: Response) => {
+  const { pidx, bookingId } = req.body;
+
+  if (!pidx || !bookingId) {
+    return res.status(400).json({ success: false, message: "Missing payment information" });
+  }
+
+  try {
+    const response = await fetch("https://a.khalti.com/api/v2/epayment/lookup/", {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json", 
+        Authorization: `Key ${process.env.KHALTI_SECRET_KEY}` 
+      },
+      body: JSON.stringify({ pidx }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Khalti API responded with status: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    switch (result.status) {
+      case "Completed":
+        // ✅ Update booking
+        await updateBooking(bookingId, { 
+          paymentStatus: "FullPayment",
+          payment: result.total_amount / 100,
+          status: "confirmed",
+          transactionId: result.transaction_id,
+          pidx: result.pidx,
+          isActiveStatus: true, // activate booking
+        });
+
+        // ✅ Fetch booking details with user and room information
+        const [rows] = await pool.query<RowDataPacket[]>(`
+          SELECT 
+            b.id AS bookingId, 
+            b.payment,
+            b.checkInDate,
+            b.checkOutDate,
+            b.people,
+            r.hostelName, 
+            r.location,
+            r.price,
+            r.ownerId,
+            r.ownerEmail,
+            u.id as tenantId,
+            u.userName as tenantName,
+            u.email as tenantEmail
+          FROM bookings b
+          JOIN rooms r ON b.roomId = r.id
+          JOIN users u ON b.userId = u.id
+          WHERE b.id = ?
+        `, [bookingId]);
+
+        if (rows.length > 0) {
+          const booking = rows[0];
+          
+          // Create a single email that will be sent to both tenant and owner
+          const combinedEmailContent = `
+            <h2>Payment Confirmed!</h2>
+            <p>Dear ${booking.tenantName} and Hostel Owner,</p>
+            <p>The payment for ${booking.hostelName} has been successfully processed.</p>
+            
+            <p><strong>Payment Details:</strong></p>
+            <ul>
+              <li>Amount Paid: Rs.${booking.payment}</li>
+              <li>Transaction ID: ${result.transaction_id}</li>
+              <li>Payment Date: ${new Date().toLocaleDateString()}</li>
+            </ul>
+            
+            <p><strong>Booking Details:</strong></p>
+            <ul>
+              <li>Hostel: ${booking.hostelName}</li>
+              <li>Location: ${booking.location}</li>
+              <li>Check-in Date: ${new Date(booking.checkInDate).toLocaleDateString()}</li>
+              ${booking.checkOutDate ? `<li>Check-out Date: ${new Date(booking.checkOutDate).toLocaleDateString()}</li>` : ''}
+              <li>Number of People: ${booking.people}</li>
+            </ul>
+            
+            <p><strong>Tenant Information:</strong></p>
+            <ul>
+              <li>Name: ${booking.tenantName}</li>
+              <li>Email: ${booking.tenantEmail}</li>
+            </ul>
+            
+            <p>Thank you for your payment! The booking is now confirmed.</p>
+          `;
+
+          try {
+            // Send single email to both tenant and owner
+            await sendMail(
+              [booking.tenantEmail,booking.ownerEmail], // Send to both addresses
+              "Payment Confirmed for Booking",
+              combinedEmailContent
+            );
+            console.log(`Payment confirmation email sent to both tenant (${booking.tenantEmail}) and owner (${booking.ownerEmail})`);
+          } catch (emailError) {
+            console.error("Failed to send payment confirmation email:", emailError);
+            // Don't fail the whole request if email fails
+          }
+
+          // Send real-time notification to owner
+          const [ownerRows] = await pool.query<RowDataPacket[]>(
+            "SELECT id, userName FROM users WHERE id = ?",
+            [booking.ownerId]
+          );
+
+          if (ownerRows.length > 0) {
+            const owner = ownerRows[0];
+            const ownerSocketId = getUserSocketId(owner.id);
+            if (ownerSocketId) {
+              io.to(ownerSocketId).emit("push-notification", {
+                message: `💰 ${booking.tenantName} just paid Rs.${booking.payment} for ${booking.hostelName}. Booking confirmed.`,
+                bookingId,
+                amount: booking.payment,
+                transactionId: result.transaction_id,
+              });
+            }
+          }
+        }
+
+        return res.json({ 
+          success: true, 
+          status: "Completed", 
+          amount: result.total_amount / 100, 
+          transactionId: result.transaction_id 
+        });
+
+      case "Pending":
+      case "Initiated":
+        await updateBooking(bookingId, { 
+          paymentStatus: "Pending", 
+          status: "pending",
+          isActiveStatus: false,
+        });
+        return res.json({ 
+          success: false, 
+          status: result.status, 
+          message: "Payment is being processed" 
+        });
+
+      case "Failed":
+      case "Cancelled":
+      case "Expired":
+        await updateBooking(bookingId, { 
+          paymentStatus: "Pending", 
+          status: "pending",
+          isActiveStatus: false,
+        });
+        return res.status(400).json({ 
+          success: false, 
+          status: result.status, 
+          message: "Payment failed, cancelled, or expired" 
+        });
+
+      default:
+        return res.status(400).json({ 
+          success: false, 
+          status: result.status, 
+          message: result.message || "Payment not completed" 
+        });
+    }
+  } catch (err) {
+    console.error("Verification error:", err);
+    return res.status(500).json({ success: false, message: "Payment verification failed. Try again later." });
+  }
+};
+
+// export const verifyPayment = async (req: Request, res: Response) => {
+//   const { pidx, bookingId } = req.body;
+
+//   if (!pidx || !bookingId) {
+//     return res.status(400).json({ success: false, message: "Missing payment information" });
+//   }
+
+//   try {
+//     const response = await fetch("https://a.khalti.com/api/v2/epayment/lookup/", {
+//       method: "POST",
+//       headers: { 
+//         "Content-Type": "application/json", 
+//         Authorization: `Key ${process.env.KHALTI_SECRET_KEY}` 
+//       },
+//       body: JSON.stringify({ pidx }),
+//     });
+
+//     if (!response.ok) {
+//       throw new Error(`Khalti API responded with status: ${response.status}`);
+//     }
+
+//     const result = await response.json();
+
+//     switch (result.status) {
+//       case "Completed":
+//         // ✅ Update booking
+//         await updateBooking(bookingId, { 
+//           paymentStatus: "FullPayment",
+//           payment: result.total_amount / 100,
+//           status: "confirmed",
+//           transactionId: result.transaction_id,
+//           pidx: result.pidx,
+//           isActiveStatus: true, // activate booking
+//         });
+
+//         // ✅ Fetch booking details with user and room information
+//         const [rows] = await pool.query<RowDataPacket[]>(`
+//           SELECT 
+//             b.id AS bookingId, 
+//             b.payment,
+//             b.checkInDate,
+//             b.checkOutDate,
+//             b.people,
+//             r.hostelName, 
+//             r.location,
+//             r.price,
+//             r.ownerId,
+//             r.ownerEmail,
+//             u.id as tenantId,
+//             u.userName as tenantName,
+//             u.email as tenantEmail
+//           FROM bookings b
+//           JOIN rooms r ON b.roomId = r.id
+//           JOIN users u ON b.userId = u.id
+//           WHERE b.id = ?
+//         `, [bookingId]);
+
+//         if (rows.length > 0) {
+//           const booking = rows[0];
+          
+//           // Send email to tenant
+//           const tenantEmailContent = `
+//             <h2>Payment Confirmed!</h2>
+//             <p>Dear ${booking.tenantName},</p>
+//             <p>Your payment for ${booking.hostelName} has been successfully processed.</p>
+//             <p><strong>Payment Details:</strong></p>
+//             <ul>
+//               <li>Amount Paid: Rs.${booking.payment}</li>
+//               <li>Transaction ID: ${result.transaction_id}</li>
+//               <li>Payment Date: ${new Date().toLocaleDateString()}</li>
+//             </ul>
+//             <p><strong>Booking Details:</strong></p>
+//             <ul>
+//               <li>Hostel: ${booking.hostelName}</li>
+//               <li>Location: ${booking.location}</li>
+//               <li>Check-in Date: ${new Date(booking.checkInDate).toLocaleDateString()}</li>
+//               ${booking.checkOutDate ? `<li>Check-out Date: ${new Date(booking.checkOutDate).toLocaleDateString()}</li>` : ''}
+//               <li>Number of People: ${booking.people}</li>
+//             </ul>
+//             <p>Thank you for your payment! Your booking is now confirmed.</p>
+//           `;
+          
+//           // Send email to owner
+//           const ownerEmailContent = `
+//             <h2>Payment Received!</h2>
+//             <p>Dear Hostel Owner,</p>
+//             <p>You have received a payment of Rs.${booking.payment} for ${booking.hostelName}.</p>
+//             <p><strong>Payment Details:</strong></p>
+//             <ul>
+//               <li>Amount: Rs.${booking.payment}</li>
+//               <li>Transaction ID: ${result.transaction_id}</li>
+//               <li>Payment Date: ${new Date().toLocaleDateString()}</li>
+//             </ul>
+//             <p><strong>Tenant Details:</strong></p>
+//             <ul>
+//               <li>Name: ${booking.tenantName}</li>
+//               <li>Email: ${booking.tenantEmail}</li>
+//             </ul>
+//             <p><strong>Booking Details:</strong></p>
+//             <ul>
+//               <li>Check-in Date: ${new Date(booking.checkInDate).toLocaleDateString()}</li>
+//               ${booking.checkOutDate ? `<li>Check-out Date: ${new Date(booking.checkOutDate).toLocaleDateString()}</li>` : ''}
+//               <li>Number of People: ${booking.people}</li>
+//             </ul>
+//           `;
+
+//           try {
+//             // Send email to tenant
+//             await sendMail(booking.tenantEmail, "Payment Confirmed", tenantEmailContent);
+//             console.log(`Payment confirmation email sent to tenant: ${booking.tenantEmail}`);
+            
+//             // Send email to owner
+//             await sendMail(booking.ownerEmail, "Payment Received", ownerEmailContent);
+//             console.log(`Payment notification email sent to owner: ${booking.ownerEmail}`);
+//           } catch (emailError) {
+//             console.error("Failed to send payment confirmation emails:", emailError);
+//             // Don't fail the whole request if email fails
+//           }
+
+//           // Send real-time notification to owner
+//           const [ownerRows] = await pool.query<RowDataPacket[]>(
+//             "SELECT id, userName FROM users WHERE id = ?",
+//             [booking.ownerId]
+//           );
+
+//           if (ownerRows.length > 0) {
+//             const owner = ownerRows[0];
+//             const ownerSocketId = getUserSocketId(owner.id);
+//             if (ownerSocketId) {
+//               io.to(ownerSocketId).emit("push-notification", {
+//                 message: `💰 ${booking.tenantName} just paid $${booking.payment} for ${booking.hostelName}. Booking confirmed.`,
+//                 bookingId,
+//                 amount: booking.payment,
+//                 transactionId: result.transaction_id,
+//               });
+//             }
+//           }
+//         }
+
+//         return res.json({ 
+//           success: true, 
+//           status: "Completed", 
+//           amount: result.total_amount / 100, 
+//           transactionId: result.transaction_id 
+//         });
+
+//       case "Pending":
+//       case "Initiated":
+//         await updateBooking(bookingId, { 
+//           paymentStatus: "Pending", 
+//           status: "pending",
+//           isActiveStatus: false,
+//         });
+//         return res.json({ 
+//           success: false, 
+//           status: result.status, 
+//           message: "Payment is being processed" 
+//         });
+
+//       case "Failed":
+//       case "Cancelled":
+//       case "Expired":
+//         await updateBooking(bookingId, { 
+//           paymentStatus: "Pending", 
+//           status: "pending",
+//           isActiveStatus: false,
+//         });
+//         return res.status(400).json({ 
+//           success: false, 
+//           status: result.status, 
+//           message: "Payment failed, cancelled, or expired" 
+//         });
+
+//       default:
+//         return res.status(400).json({ 
+//           success: false, 
+//           status: result.status, 
+//           message: result.message || "Payment not completed" 
+//         });
+//     }
+//   } catch (err) {
+//     console.error("Verification error:", err);
+//     return res.status(500).json({ success: false, message: "Payment verification failed. Try again later." });
+//   }
+// };
+// Update booking helper
+async function updateBooking(bookingId: string, data: any) {
+  const fields: string[] = [];
+  const values: any[] = [];
+
+  for (const key in data) {
+    fields.push(`${key} = ?`);
+    values.push(data[key]);
+  }
+
+  values.push(bookingId);
+  const query = `UPDATE bookings SET ${fields.join(", ")} WHERE id = ?`;
+
+  await pool.query(query, values);
+}

@@ -1,0 +1,20 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.otp = exports.Payment = exports.CloudeRoute = exports.RoomRoute = exports.UserRoute = exports.BookingRoute = exports.AuthRoute = void 0;
+var auth_route_1 = require("./auth.route");
+Object.defineProperty(exports, "AuthRoute", { enumerable: true, get: function () { return __importDefault(auth_route_1).default; } });
+var booking_route_1 = require("./booking.route");
+Object.defineProperty(exports, "BookingRoute", { enumerable: true, get: function () { return __importDefault(booking_route_1).default; } });
+var user_route_1 = require("./user.route");
+Object.defineProperty(exports, "UserRoute", { enumerable: true, get: function () { return __importDefault(user_route_1).default; } });
+var hostel_route_1 = require("./hostel.route");
+Object.defineProperty(exports, "RoomRoute", { enumerable: true, get: function () { return __importDefault(hostel_route_1).default; } });
+var cloude_route_1 = require("./cloude.route");
+Object.defineProperty(exports, "CloudeRoute", { enumerable: true, get: function () { return __importDefault(cloude_route_1).default; } });
+var payment_route_1 = require("./payment.route");
+Object.defineProperty(exports, "Payment", { enumerable: true, get: function () { return __importDefault(payment_route_1).default; } });
+var otp_routes_1 = require("./otp.routes");
+Object.defineProperty(exports, "otp", { enumerable: true, get: function () { return __importDefault(otp_routes_1).default; } });
