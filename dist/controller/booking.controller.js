@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -11,7 +20,7 @@ const const_1 = require("../const");
 const CusomError_1 = __importDefault(require("../middleware/CusomError"));
 // ----------------- Create Booking -----------------
 // ✅ Update booking by ID
-const updateBookingById = async (req, res, next) => {
+const updateBookingById = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
         const { checkOutDate, remark } = req.body;
@@ -30,7 +39,7 @@ const updateBookingById = async (req, res, next) => {
       WHERE id = ? 
       AND isActiveStatus = true;          -- ✅ only update if active
     `;
-        const [result] = await db_1.pool.query(query, [
+        const [result] = yield db_1.pool.query(query, [
             checkOutDate || null,
             remark || null,
             checkOutDate,
@@ -47,14 +56,15 @@ const updateBookingById = async (req, res, next) => {
         console.error("Update Booking Error:", error);
         res.status(500).json({ message: "Internal Server Error" });
     }
-};
+});
 exports.updateBookingById = updateBookingById;
-const createBooking = async (req, res, next) => {
+const createBooking = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const data = req.body;
-        const checkOutDate = data.checkOutDate ?? null;
+        const checkOutDate = (_a = data.checkOutDate) !== null && _a !== void 0 ? _a : null;
         // 🔍 Check if room is already booked by any user with isActiveStatus = true
-        const [activeRoomBookings] = await db_1.pool.query(`SELECT id 
+        const [activeRoomBookings] = yield db_1.pool.query(`SELECT id 
        FROM bookings 
        WHERE roomId = ? AND isActiveStatus = true 
        LIMIT 1`, [data.roomId]);
@@ -64,7 +74,7 @@ const createBooking = async (req, res, next) => {
             });
         }
         // 🔍 Original user-specific booking check
-        const [existingBookings] = await db_1.pool.query(`SELECT id, status 
+        const [existingBookings] = yield db_1.pool.query(`SELECT id, status 
        FROM bookings 
        WHERE userId = ? AND roomId = ? 
        ORDER BY createdAt DESC 
@@ -77,11 +87,11 @@ const createBooking = async (req, res, next) => {
                 });
             }
             if (lastBooking.status === "cancelled") {
-                await db_1.pool.query("DELETE FROM bookings WHERE id = ?", [lastBooking.id]);
+                yield db_1.pool.query("DELETE FROM bookings WHERE id = ?", [lastBooking.id]);
             }
         }
         // ✅ Insert new booking
-        const [result] = await db_1.pool.query(`INSERT INTO bookings 
+        const [result] = yield db_1.pool.query(`INSERT INTO bookings 
        (userId, roomId, checkInDate, checkOutDate, paymentStatus, people, payment, status, remark, transactionId, pidx, isActiveStatus)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
             data.userId,
@@ -99,8 +109,8 @@ const createBooking = async (req, res, next) => {
         ]);
         const bookingId = result.insertId;
         // 🔍 Fetch user and room details
-        const [userRows] = await db_1.pool.query("SELECT userName, email, contact, address FROM users WHERE id = ?", [data.userId]);
-        const [roomRows] = await db_1.pool.query("SELECT hostelName, location, peopleNumber, price, imgUrls, ownerEmail, ownerId FROM rooms WHERE id = ?", [data.roomId]);
+        const [userRows] = yield db_1.pool.query("SELECT userName, email, contact, address FROM users WHERE id = ?", [data.userId]);
+        const [roomRows] = yield db_1.pool.query("SELECT hostelName, location, peopleNumber, price, imgUrls, ownerEmail, ownerId FROM rooms WHERE id = ?", [data.roomId]);
         if (userRows.length === 0)
             return res.status(404).json({ message: "User not found" });
         if (roomRows.length === 0)
@@ -117,7 +127,7 @@ const createBooking = async (req, res, next) => {
         }
         // 📧 Send email notification (first image as thumbnail)
         const body = (0, utils_1.BookingNotification)(room.ownerEmail, user.userName, roomImages[0] || "", user.email, user.contact, user.address, data.people, room.hostelName, room.location, room.peopleNumber, room.price);
-        await (0, utils_1.sendMail)(room.ownerEmail, "Booking Reservation", body);
+        yield (0, utils_1.sendMail)(room.ownerEmail, "Booking Reservation", body);
         // 🔔 Send real-time socket notification
         const notification = `Following user with name: ${user.userName} has sent a booking notification to ${room.hostelName}`;
         const ownerSocketId = (0, RealTime_1.getUserSocketId)(room.ownerId);
@@ -137,7 +147,7 @@ const createBooking = async (req, res, next) => {
     catch (err) {
         next(err);
     }
-};
+});
 exports.createBooking = createBooking;
 // export const updateBooking = async (req: Request, res: Response, next: NextFunction) => {
 //   try {
@@ -200,7 +210,8 @@ exports.createBooking = createBooking;
 //   }
 // };
 // ----------------- Get All Bookings -----------------
-const updateBooking = async (req, res, next) => {
+const updateBooking = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
     try {
         const { id } = req.params;
         // Handle the specific format {body: {isActiveStatus: 0}}
@@ -239,19 +250,19 @@ const updateBooking = async (req, res, next) => {
         WHERE id = ?
       `;
             params = [
-                data.userId ?? null,
-                data.roomId ?? null,
-                data.checkInDate ?? null,
-                data.checkOutDate ?? null,
-                data.paymentStatus ?? null,
-                data.people ?? null,
-                data.payment ?? null,
-                data.status ?? null,
-                data.isActiveStatus ?? null,
+                (_a = data.userId) !== null && _a !== void 0 ? _a : null,
+                (_b = data.roomId) !== null && _b !== void 0 ? _b : null,
+                (_c = data.checkInDate) !== null && _c !== void 0 ? _c : null,
+                (_d = data.checkOutDate) !== null && _d !== void 0 ? _d : null,
+                (_e = data.paymentStatus) !== null && _e !== void 0 ? _e : null,
+                (_f = data.people) !== null && _f !== void 0 ? _f : null,
+                (_g = data.payment) !== null && _g !== void 0 ? _g : null,
+                (_h = data.status) !== null && _h !== void 0 ? _h : null,
+                (_j = data.isActiveStatus) !== null && _j !== void 0 ? _j : null,
                 id
             ];
         }
-        const [result] = await db_1.pool.query(query, params);
+        const [result] = yield db_1.pool.query(query, params);
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: "Booking not found" });
         }
@@ -259,7 +270,7 @@ const updateBooking = async (req, res, next) => {
         if (data.status === "confirmed") {
             try {
                 // Get booking details with user and room information
-                const [bookingDetails] = await db_1.pool.query(`
+                const [bookingDetails] = yield db_1.pool.query(`
           SELECT 
             b.*,
             u.userName, 
@@ -293,7 +304,7 @@ const updateBooking = async (req, res, next) => {
             <p>Thank you for choosing our service!</p>
           `;
                     // Send email to tenant
-                    await (0, utils_1.sendMail)(booking.tenantEmail, "Booking Confirmed", tenantEmailContent);
+                    yield (0, utils_1.sendMail)(booking.tenantEmail, "Booking Confirmed", tenantEmailContent);
                     // console.log(`Confirmation email sent to tenant: ${booking.tenantEmail}`);
                 }
             }
@@ -307,9 +318,9 @@ const updateBooking = async (req, res, next) => {
     catch (err) {
         next(err);
     }
-};
+});
 exports.updateBooking = updateBooking;
-const getAllBooking = async (req, res, next) => {
+const getAllBooking = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         let { page = 1, limit = 10, status = "", search = "", isActiveStatus = "" } = req.query;
         page = Number(page);
@@ -332,14 +343,14 @@ const getAllBooking = async (req, res, next) => {
         }
         const whereSQL = whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : "";
         // Count total bookings for pagination
-        const [countRows] = await db_1.pool.query(`SELECT COUNT(*) as total FROM bookings b
+        const [countRows] = yield db_1.pool.query(`SELECT COUNT(*) as total FROM bookings b
        JOIN users u ON b.userId = u.id
        JOIN rooms r ON b.roomId = r.id
        ${whereSQL}`, values);
         const total = countRows[0].total;
         const totalPages = Math.ceil(total / limit);
         // Main query with pagination
-        const [rows] = await db_1.pool.query(`SELECT 
+        const [rows] = yield db_1.pool.query(`SELECT 
          b.id AS bookingId,
          b.checkInDate,
          b.checkOutDate,
@@ -400,7 +411,7 @@ const getAllBooking = async (req, res, next) => {
                     try {
                         return Array.isArray(row.imgUrls) ? row.imgUrls : JSON.parse(row.imgUrls);
                     }
-                    catch {
+                    catch (_a) {
                         return [];
                     }
                 })(),
@@ -422,14 +433,14 @@ const getAllBooking = async (req, res, next) => {
     catch (err) {
         next(err);
     }
-};
+});
 exports.getAllBooking = getAllBooking;
 // ----------------- Get Bookings by Room ID -----------------
 // ----------------- Get Bookings by Room ID -----------------
-const getBookingByRoomId = async (req, res, next) => {
+const getBookingByRoomId = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const [rows] = await db_1.pool.query(`SELECT b.*, 
+        const [rows] = yield db_1.pool.query(`SELECT b.*, 
               u.userName, u.email, u.contact, 
               r.hostelName, r.location 
        FROM bookings b
@@ -443,13 +454,13 @@ const getBookingByRoomId = async (req, res, next) => {
     catch (err) {
         next(err);
     }
-};
+});
 exports.getBookingByRoomId = getBookingByRoomId;
 // ----------------- Get Bookings by User ID -----------------
-const getBookingByUserId = async (req, res, next) => {
+const getBookingByUserId = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const [rows] = await db_1.pool.query(`SELECT b.*, 
+        const [rows] = yield db_1.pool.query(`SELECT b.*, 
               u.userName, u.email, u.contact, 
               r.hostelName, r.location 
        FROM bookings b
@@ -463,13 +474,13 @@ const getBookingByUserId = async (req, res, next) => {
     catch (err) {
         next(err);
     }
-};
+});
 exports.getBookingByUserId = getBookingByUserId;
 // ----------------- Delete Booking -----------------
-const deleteBooking = async (req, res, next) => {
+const deleteBooking = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const [result] = await db_1.pool.query("DELETE FROM bookings WHERE id = ?", [id]);
+        const [result] = yield db_1.pool.query("DELETE FROM bookings WHERE id = ?", [id]);
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: "Booking not found" });
         }
@@ -478,5 +489,5 @@ const deleteBooking = async (req, res, next) => {
     catch (err) {
         next(err);
     }
-};
+});
 exports.deleteBooking = deleteBooking;

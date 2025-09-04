@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -8,7 +17,8 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const CusomError_1 = __importDefault(require("./CusomError"));
 const db_1 = require("../db");
 const isOwner = (req, res, next) => {
-    const token = req.headers.authorization?.split(" ")[1];
+    var _a;
+    const token = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1];
     if (!token)
         return CusomError_1.default.noTokenError(next);
     try {
@@ -27,7 +37,8 @@ const isOwner = (req, res, next) => {
 };
 exports.isOwner = isOwner;
 const isAuthorized = (req, res, next) => {
-    const token = req.headers.authorization?.split(" ")[1];
+    var _a;
+    const token = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1];
     if (!token) {
         return CusomError_1.default.unAuthorizedError(next);
     }
@@ -41,38 +52,38 @@ const isAuthorized = (req, res, next) => {
     }
 };
 exports.isAuthorized = isAuthorized;
-const bookingverifyOTP = async (req, res, next) => {
+const bookingverifyOTP = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { otp, userId } = req.body;
         if (!otp || !userId)
             return CusomError_1.default.entityPropsMissingError(next);
-        const [rows] = await db_1.pool.query("SELECT * FROM users WHERE id=? AND otp=?", [userId, otp]);
+        const [rows] = yield db_1.pool.query("SELECT * FROM users WHERE id=? AND otp=?", [userId, otp]);
         if (rows.length === 0)
             return CusomError_1.default.invalidField(next);
         // Mark as verified and remove OTP
-        await db_1.pool.query("UPDATE users SET isVerify = ?, otp = NULL WHERE id = ?", [true, userId]);
+        yield db_1.pool.query("UPDATE users SET isVerify = ?, otp = NULL WHERE id = ?", [true, userId]);
         // ✅ Instead of responding, call next()
         next();
     }
     catch (error) {
         next(error);
     }
-};
+});
 exports.bookingverifyOTP = bookingverifyOTP;
-const verifyOTP = async (req, res, next) => {
+const verifyOTP = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { otp, userId } = req.body; // frontend must send userId too
         if (!otp || !userId)
             return CusomError_1.default.entityPropsMissingError(next);
-        const [rows] = await db_1.pool.query("SELECT * FROM users WHERE id=? AND otp=?", [userId, otp]);
+        const [rows] = yield db_1.pool.query("SELECT * FROM users WHERE id=? AND otp=?", [userId, otp]);
         if (rows.length === 0)
             return CusomError_1.default.invalidField(next);
         // Mark as verified and remove OTP
-        await db_1.pool.query("UPDATE users SET isVerify = ?, otp = NULL WHERE id = ?", [true, userId]);
+        yield db_1.pool.query("UPDATE users SET isVerify = ?, otp = NULL WHERE id = ?", [true, userId]);
         res.status(200).json({ msg: "Verified successfully!!!" });
     }
     catch (error) {
         next(error);
     }
-};
+});
 exports.verifyOTP = verifyOTP;

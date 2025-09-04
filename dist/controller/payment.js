@@ -2,6 +2,15 @@
 // import { Request, Response } from "express";
 // import dotenv from "dotenv";
 // import { pool } from "../db";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -13,7 +22,7 @@ const RealTime_1 = require("../real-time/RealTime");
 const utils_1 = require("../utils");
 dotenv_1.default.config();
 // Initiate payment
-const initiatePayment = async (req, res) => {
+const initiatePayment = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const amount = parseInt(req.params.amount, 10);
     if (isNaN(amount) || amount <= 0)
         return res.status(400).json({ error: "Invalid amount" });
@@ -35,7 +44,7 @@ const initiatePayment = async (req, res) => {
         amount_breakdown: [{ label: "Total Price", amount: amountInPaisa }],
     });
     try {
-        const response = await fetch("https://a.khalti.com/api/v2/epayment/initiate/", {
+        const response = yield fetch("https://a.khalti.com/api/v2/epayment/initiate/", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -43,7 +52,7 @@ const initiatePayment = async (req, res) => {
             },
             body: data,
         });
-        const result = await response.json();
+        const result = yield response.json();
         if (result.payment_url)
             return res.json({ url: result.payment_url });
         return res.status(400).json({ error: "Failed to initiate payment", details: result });
@@ -52,15 +61,15 @@ const initiatePayment = async (req, res) => {
         console.error("Server error:", err);
         return res.status(500).json({ error: "Server error" });
     }
-};
+});
 exports.initiatePayment = initiatePayment;
-const verifyPayment = async (req, res) => {
+const verifyPayment = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { pidx, bookingId } = req.body;
     if (!pidx || !bookingId) {
         return res.status(400).json({ success: false, message: "Missing payment information" });
     }
     try {
-        const response = await fetch("https://a.khalti.com/api/v2/epayment/lookup/", {
+        const response = yield fetch("https://a.khalti.com/api/v2/epayment/lookup/", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -71,11 +80,11 @@ const verifyPayment = async (req, res) => {
         if (!response.ok) {
             throw new Error(`Khalti API responded with status: ${response.status}`);
         }
-        const result = await response.json();
+        const result = yield response.json();
         switch (result.status) {
             case "Completed":
                 // ✅ Update booking
-                await updateBooking(bookingId, {
+                yield updateBooking(bookingId, {
                     paymentStatus: "FullPayment",
                     payment: result.total_amount / 100,
                     status: "confirmed",
@@ -84,7 +93,7 @@ const verifyPayment = async (req, res) => {
                     isActiveStatus: true, // activate booking
                 });
                 // ✅ Fetch booking details with user and room information
-                const [rows] = await db_1.pool.query(`
+                const [rows] = yield db_1.pool.query(`
           SELECT 
             b.id AS bookingId, 
             b.payment,
@@ -138,7 +147,7 @@ const verifyPayment = async (req, res) => {
           `;
                     try {
                         // Send single email to both tenant and owner
-                        await (0, utils_1.sendMail)([booking.tenantEmail, booking.ownerEmail], // Send to both addresses
+                        yield (0, utils_1.sendMail)([booking.tenantEmail, booking.ownerEmail], // Send to both addresses
                         "Payment Confirmed for Booking", combinedEmailContent);
                         console.log(`Payment confirmation email sent to both tenant (${booking.tenantEmail}) and owner (${booking.ownerEmail})`);
                     }
@@ -147,7 +156,7 @@ const verifyPayment = async (req, res) => {
                         // Don't fail the whole request if email fails
                     }
                     // Send real-time notification to owner
-                    const [ownerRows] = await db_1.pool.query("SELECT id, userName FROM users WHERE id = ?", [booking.ownerId]);
+                    const [ownerRows] = yield db_1.pool.query("SELECT id, userName FROM users WHERE id = ?", [booking.ownerId]);
                     if (ownerRows.length > 0) {
                         const owner = ownerRows[0];
                         const ownerSocketId = (0, RealTime_1.getUserSocketId)(owner.id);
@@ -169,7 +178,7 @@ const verifyPayment = async (req, res) => {
                 });
             case "Pending":
             case "Initiated":
-                await updateBooking(bookingId, {
+                yield updateBooking(bookingId, {
                     paymentStatus: "Pending",
                     status: "pending",
                     isActiveStatus: false,
@@ -182,7 +191,7 @@ const verifyPayment = async (req, res) => {
             case "Failed":
             case "Cancelled":
             case "Expired":
-                await updateBooking(bookingId, {
+                yield updateBooking(bookingId, {
                     paymentStatus: "Pending",
                     status: "pending",
                     isActiveStatus: false,
@@ -204,7 +213,7 @@ const verifyPayment = async (req, res) => {
         console.error("Verification error:", err);
         return res.status(500).json({ success: false, message: "Payment verification failed. Try again later." });
     }
-};
+});
 exports.verifyPayment = verifyPayment;
 // export const verifyPayment = async (req: Request, res: Response) => {
 //   const { pidx, bookingId } = req.body;
@@ -375,14 +384,16 @@ exports.verifyPayment = verifyPayment;
 //   }
 // };
 // Update booking helper
-async function updateBooking(bookingId, data) {
-    const fields = [];
-    const values = [];
-    for (const key in data) {
-        fields.push(`${key} = ?`);
-        values.push(data[key]);
-    }
-    values.push(bookingId);
-    const query = `UPDATE bookings SET ${fields.join(", ")} WHERE id = ?`;
-    await db_1.pool.query(query, values);
+function updateBooking(bookingId, data) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const fields = [];
+        const values = [];
+        for (const key in data) {
+            fields.push(`${key} = ?`);
+            values.push(data[key]);
+        }
+        values.push(bookingId);
+        const query = `UPDATE bookings SET ${fields.join(", ")} WHERE id = ?`;
+        yield db_1.pool.query(query, values);
+    });
 }

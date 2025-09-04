@@ -1,7 +1,7 @@
 
 import express from "express";
 import cors from "cors";
-import Logger from "./middleware/Logger";
+
 import {
   AuthRoute,
   BookingRoute,
@@ -10,7 +10,7 @@ import {
   CloudeRoute,
   Payment,
   otp,
-} from "./routes/";
+} from "./routes";
 
 import { app, serverInstance } from "./real-time/RealTime";
 app.use(cors());
@@ -26,7 +26,7 @@ app.use("/room", RoomRoute);
 app.use("/otp", otp);
 app.use("/cloudinary", CloudeRoute);
 app.use("/payment", Payment);
-app.use(Logger);
+// app.use(Logger);
 serverInstance.listen(3333, () => {
   console.log("🚀 Server has started on port 3333");
 });

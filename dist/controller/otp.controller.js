@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -7,14 +16,14 @@ exports.SendOtp = void 0;
 const utils_1 = require("../utils");
 const db_1 = require("../db");
 const CusomError_1 = __importDefault(require("../middleware/CusomError"));
-const SendOtp = async (req, res, next) => {
+const SendOtp = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { userId, userName, role, email, contact, address } = req.body;
         if (!userId)
             return CusomError_1.default.entityPropsMissingError(next);
         const otp = (0, utils_1.GenerateOtp)();
         // Save OTP in database for verification
-        await db_1.pool.query("UPDATE users SET otp=? WHERE id=?", [otp, userId]);
+        yield db_1.pool.query("UPDATE users SET otp=? WHERE id=?", [otp, userId]);
         const payload = {
             userName,
             role,
@@ -38,11 +47,11 @@ const SendOtp = async (req, res, next) => {
       <p style="font-size: 12px; text-align: center; color: #999;">&copy; 2025 Sajilo Aawas. All rights reserved.</p>
     </div>`;
         const token = (0, utils_1.generateToken)(payload);
-        await (0, utils_1.sendMail)(email, "Booking Verification", emailBody);
+        yield (0, utils_1.sendMail)(email, "Booking Verification", emailBody);
         return res.status(200).json({ msg: "OTP has been sent to your mail!!!", token });
     }
     catch (error) {
         return CusomError_1.default.tryCatchError(next);
     }
-};
+});
 exports.SendOtp = SendOtp;

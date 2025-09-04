@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const Logger_1 = __importDefault(require("./middleware/Logger"));
-const routes_1 = require("./routes/");
+const routes_1 = require("./routes");
 const RealTime_1 = require("./real-time/RealTime");
 RealTime_1.app.use((0, cors_1.default)());
 RealTime_1.app.use(express_1.default.json({ limit: "10mb" }));

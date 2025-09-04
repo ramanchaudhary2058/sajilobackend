@@ -5,8 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
-const Logger_1 = __importDefault(require("./middleware/Logger"));
-const routes_1 = require("./routes/");
+const routes_1 = require("./routes");
 const RealTime_1 = require("./real-time/RealTime");
 RealTime_1.app.use((0, cors_1.default)());
 RealTime_1.app.use(express_1.default.json({ limit: "10mb" }));
@@ -19,7 +18,7 @@ RealTime_1.app.use("/room", routes_1.RoomRoute);
 RealTime_1.app.use("/otp", routes_1.otp);
 RealTime_1.app.use("/cloudinary", routes_1.CloudeRoute);
 RealTime_1.app.use("/payment", routes_1.Payment);
-RealTime_1.app.use(Logger_1.default);
+// app.use(Logger);
 RealTime_1.serverInstance.listen(3333, () => {
     console.log("🚀 Server has started on port 3333");
 });

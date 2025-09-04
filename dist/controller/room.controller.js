@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -8,11 +17,11 @@ const db_1 = require("../db");
 const axios_1 = __importDefault(require("axios"));
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
-const createRoom = async (req, res, next) => {
+const createRoom = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const recaptchaToken = req.body.recaptchaToken;
         // Verify reCAPTCHA
-        const verificationResponse = await axios_1.default.post(`https://www.google.com/recaptcha/api/siteverify`, null, {
+        const verificationResponse = yield axios_1.default.post(`https://www.google.com/recaptcha/api/siteverify`, null, {
             params: {
                 secret: process.env.GOOGLE_SECRET_KEY_CAPTCHA,
                 response: recaptchaToken,
@@ -26,7 +35,7 @@ const createRoom = async (req, res, next) => {
         location, price, frequency, peopleNumber, totalBed, email, contact, ownerEmail, ownerId, } = req.body;
         // Convert array to JSON string for database storage
         const imgUrlsJson = JSON.stringify(imgUrls);
-        const [result] = await db_1.pool.query(`INSERT INTO rooms 
+        const [result] = yield db_1.pool.query(`INSERT INTO rooms 
        (title, hostelName, imgUrls, location, price, frequency, peopleNumber, totalBed, email, contact, ownerEmail, ownerId)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [title, hostelName, imgUrlsJson, location, price, frequency, peopleNumber, totalBed, email, contact, ownerEmail, ownerId]);
         res.status(201).json({
@@ -37,9 +46,9 @@ const createRoom = async (req, res, next) => {
     catch (err) {
         next(err);
     }
-};
+});
 exports.createRoom = createRoom;
-const getAllRoom = async (req, res, next) => {
+const getAllRoom = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         let { page = 1, limit = 5, search = "", price, location } = req.query;
         page = Number(page);
@@ -64,11 +73,11 @@ const getAllRoom = async (req, res, next) => {
         }
         const whereSQL = whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : "";
         // Total count
-        const [countRows] = await db_1.pool.query(`SELECT COUNT(*) as total FROM rooms ${whereSQL}`, values);
+        const [countRows] = yield db_1.pool.query(`SELECT COUNT(*) as total FROM rooms ${whereSQL}`, values);
         const total = countRows[0].total;
         const totalPages = Math.ceil(total / limit);
         // Paginated rows
-        const [rows] = await db_1.pool.query(`SELECT * FROM rooms ${whereSQL} ORDER BY createdAt DESC LIMIT ? OFFSET ?`, [...values, limit, offset]);
+        const [rows] = yield db_1.pool.query(`SELECT * FROM rooms ${whereSQL} ORDER BY createdAt DESC LIMIT ? OFFSET ?`, [...values, limit, offset]);
         res.json({
             data: rows,
             pagination: {
@@ -82,17 +91,17 @@ const getAllRoom = async (req, res, next) => {
     catch (err) {
         next(err);
     }
-};
+});
 exports.getAllRoom = getAllRoom;
 // ----------------- Get Room By ID -----------------
-const getRoomById = async (req, res, next) => {
+const getRoomById = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
         // Validate ID
         if (!id || isNaN(Number(id))) {
             return res.status(400).json({ message: "Invalid room ID" });
         }
-        const [rows] = await db_1.pool.query("SELECT * FROM rooms WHERE id = ?", [id]);
+        const [rows] = yield db_1.pool.query("SELECT * FROM rooms WHERE id = ?", [id]);
         if (rows.length === 0) {
             return res.status(404).json({ message: "Room not found" });
         }
@@ -105,7 +114,7 @@ const getRoomById = async (req, res, next) => {
         console.error('Error fetching room:', err);
         next(err);
     }
-};
+});
 exports.getRoomById = getRoomById;
 // export const updateRoom = async (req: Request, res: Response, next: NextFunction) => {
 //   try {
@@ -196,7 +205,8 @@ exports.getRoomById = getRoomById;
 //     next(err);
 //   }
 // };
-const updateRoom = async (req, res, next) => {
+const updateRoom = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const { id } = req.params;
         // Handle the specific format {body: {isAvailable: 0}}
@@ -283,20 +293,20 @@ const updateRoom = async (req, res, next) => {
                 data.email,
                 data.contact,
                 data.ownerEmail,
-                data.isAvailable ?? null,
+                (_a = data.isAvailable) !== null && _a !== void 0 ? _a : null,
                 id,
             ];
         }
         // Check room exists
-        const [checkRows] = await db_1.pool.query("SELECT id FROM rooms WHERE id = ?", [id]);
+        const [checkRows] = yield db_1.pool.query("SELECT id FROM rooms WHERE id = ?", [id]);
         if (checkRows.length === 0) {
             return res.status(404).json({ message: "Room not found" });
         }
-        const [result] = await db_1.pool.query(query, params);
+        const [result] = yield db_1.pool.query(query, params);
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: "Room not found or no changes made" });
         }
-        const [updatedRows] = await db_1.pool.query("SELECT * FROM rooms WHERE id = ?", [id]);
+        const [updatedRows] = yield db_1.pool.query("SELECT * FROM rooms WHERE id = ?", [id]);
         res.json({
             message: "Room updated successfully",
             room: updatedRows[0],
@@ -306,13 +316,13 @@ const updateRoom = async (req, res, next) => {
         console.error("Error updating room:", err);
         next(err);
     }
-};
+});
 exports.updateRoom = updateRoom;
 // ----------------- Delete Room -----------------
-const deleteRoom = async (req, res, next) => {
+const deleteRoom = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const [result] = await db_1.pool.query("DELETE FROM rooms WHERE id = ?", [id]);
+        const [result] = yield db_1.pool.query("DELETE FROM rooms WHERE id = ?", [id]);
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: "Room not found" });
         }
@@ -321,5 +331,5 @@ const deleteRoom = async (req, res, next) => {
     catch (err) {
         next(err);
     }
-};
+});
 exports.deleteRoom = deleteRoom;

@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -14,7 +23,7 @@ const transporter = nodemailer_1.default.createTransport({
         pass: process.env.GMAIL_PASSWORD,
     },
 });
-const sendMail = async (to, subject, text) => {
+const sendMail = (to, subject, text) => __awaiter(void 0, void 0, void 0, function* () {
     console.log(process.env.GMAIL_ACCOUNT);
     const mailOptions = {
         from: process.env.GMAIL_ACCOUNT,
@@ -23,11 +32,11 @@ const sendMail = async (to, subject, text) => {
         html: text,
     };
     try {
-        await transporter.sendMail(mailOptions);
+        yield transporter.sendMail(mailOptions);
         console.log(`Email sent to ${to}`);
     }
     catch (error) {
         console.error("Error sending email:", error);
     }
-};
+});
 exports.sendMail = sendMail;

@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -7,7 +16,7 @@ exports.deleteUser = exports.updateUserAccount = exports.getUserById = exports.g
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const db_1 = require("../db");
 // ----------------- Get All Users -----------------
-const getAllUser = async (req, res, next) => {
+const getAllUser = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         let { page = 1, limit = 10, role = "", search = "" } = req.query;
         page = Number(page);
@@ -26,11 +35,11 @@ const getAllUser = async (req, res, next) => {
         }
         const whereSQL = whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : "";
         // Count total users for pagination
-        const [countRows] = await db_1.pool.query(`SELECT COUNT(*) as total FROM users ${whereSQL}`, values);
+        const [countRows] = yield db_1.pool.query(`SELECT COUNT(*) as total FROM users ${whereSQL}`, values);
         const total = countRows[0].total;
         const totalPages = Math.ceil(total / limit);
         // Main query with pagination (added isVerify ✅)
-        const [rows] = await db_1.pool.query(`SELECT id, userName, email, contact, address, role, isVerify, createdAt, updatedAt 
+        const [rows] = yield db_1.pool.query(`SELECT id, userName, email, contact, address, role, isVerify, createdAt, updatedAt 
        FROM users
        ${whereSQL}
        ORDER BY createdAt DESC
@@ -48,13 +57,13 @@ const getAllUser = async (req, res, next) => {
     catch (err) {
         next(err);
     }
-};
+});
 exports.getAllUser = getAllUser;
 // ----------------- Get User By ID -----------------
-const getUserById = async (req, res, next) => {
+const getUserById = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const [rows] = await db_1.pool.query("SELECT id, userName, email, contact, address, role FROM users WHERE id = ?", [id]);
+        const [rows] = yield db_1.pool.query("SELECT id, userName, email, contact, address, role FROM users WHERE id = ?", [id]);
         if (rows.length === 0) {
             return res.status(404).json({ message: "User not found" });
         }
@@ -63,7 +72,7 @@ const getUserById = async (req, res, next) => {
     catch (err) {
         next(err);
     }
-};
+});
 exports.getUserById = getUserById;
 // ----------------- Update User -----------------
 // export const updateUserAccount = async (
@@ -107,7 +116,8 @@ exports.getUserById = getUserById;
 //     next(err);
 //   }
 // };
-const updateUserAccount = async (req, res, next) => {
+const updateUserAccount = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d, _e, _f;
     try {
         const { id } = req.params;
         // Handle the specific format {body: {isVerify: 0}}
@@ -115,7 +125,7 @@ const updateUserAccount = async (req, res, next) => {
         const data = requestBody.data || requestBody;
         let hashedPwd = null;
         if (data.password) {
-            hashedPwd = await bcrypt_1.default.hash(data.password, 10);
+            hashedPwd = yield bcrypt_1.default.hash(data.password, 10);
         }
         // Check if only status fields are being updated
         const isStatusOnlyUpdate = (data.isVerify !== undefined) &&
@@ -147,17 +157,17 @@ const updateUserAccount = async (req, res, next) => {
         WHERE id = ?
       `;
             params = [
-                data.userName ?? null,
-                data.email ?? null,
-                data.contact ?? null,
-                data.address ?? null,
-                data.role ?? null,
+                (_a = data.userName) !== null && _a !== void 0 ? _a : null,
+                (_b = data.email) !== null && _b !== void 0 ? _b : null,
+                (_c = data.contact) !== null && _c !== void 0 ? _c : null,
+                (_d = data.address) !== null && _d !== void 0 ? _d : null,
+                (_e = data.role) !== null && _e !== void 0 ? _e : null,
                 hashedPwd,
-                data.isVerify ?? null,
+                (_f = data.isVerify) !== null && _f !== void 0 ? _f : null,
                 id,
             ];
         }
-        const [result] = await db_1.pool.query(query, params);
+        const [result] = yield db_1.pool.query(query, params);
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: "User not found" });
         }
@@ -166,13 +176,13 @@ const updateUserAccount = async (req, res, next) => {
     catch (err) {
         next(err);
     }
-};
+});
 exports.updateUserAccount = updateUserAccount;
-const deleteUser = async (req, res, next) => {
+const deleteUser = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
         console.log("Deleting user with ID:", id); // 👈 log incoming id
-        const [result] = await db_1.pool.query("DELETE FROM users WHERE id = ?", [id]);
+        const [result] = yield db_1.pool.query("DELETE FROM users WHERE id = ?", [id]);
         console.log("Delete Result:", result); // 👈 check MySQL response
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: "User not found" });
@@ -183,5 +193,5 @@ const deleteUser = async (req, res, next) => {
         console.error("Delete Error:", err); // 👈 show full error
         next(err);
     }
-};
+});
 exports.deleteUser = deleteUser;
